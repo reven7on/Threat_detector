@@ -1,0 +1,28 @@
+version: '3'
+
+services:
+  backend:
+    build: ./threat-detector-backend
+    container_name: threat-detector-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./threat-detector-backend:/app
+    networks:
+      - threat-detector-network
+
+  frontend:
+    build: ./threat-detector-frontend
+    container_name: threat-detector-frontend
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./threat-detector-frontend:/app
+    depends_on:
+      - backend
+    networks:
+      - threat-detector-network
+
+networks:
+  threat-detector-network:
+    driver: bridge
