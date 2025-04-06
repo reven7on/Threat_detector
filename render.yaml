@@ -1,12 +1,15 @@
 services:
+  # Веб-сервис, объединяющий фронтенд и бэкенд
   - type: web
-    name: threat-detector
+    name: threatdetector
     env: docker
-    dockerfilePath: ./docker-compose.yml
-    dockerCommand: docker-compose up
     plan: free
-    autoDeploy: true
+    # Настройки для автоматического деплоя из GitHub
+    buildCommand: docker build -t threatdetector .
+    startCommand: docker run -p $PORT:80 threatdetector
     envVars:
-      - key: PORT
-        value: 10000
+      - key: DOCKER_ENV
+        value: true
+      - key: BACKEND_CORS_ORIGINS
+        value: '["https://threatdetector.onrender.com", "https://*.render.com"]'
     healthCheckPath: /

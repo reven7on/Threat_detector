@@ -1,52 +1,75 @@
-# ThreatDetector Backend API
+# ThreatDetector
 
-This is the backend API for the ThreatDetector application, built with FastAPI.
+Приложение для обнаружения потенциальных угроз на основе анализа файлов и URL.
 
-## Setup
+## Локальная разработка
 
-1. Create a virtual environment:
+### С использованием Docker
 
-```bash
+1. Клонируйте репозиторий:
+
+```
+git clone https://github.com/ваш-юзернейм/ThreatDetector.git
+cd ThreatDetector
+```
+
+2. Запустите приложение с помощью Docker Compose:
+
+```
+docker-compose up --build
+```
+
+3. Откройте браузер и перейдите по адресу: http://localhost
+
+### Без Docker
+
+#### Запуск бэкенда:
+
+```
+cd threat-detector-backend
 python -m venv venv
-```
-
-2. Activate the virtual environment:
-
-   - On Windows:
-
-   ```bash
-   venv\Scripts\activate
-   ```
-
-   - On Unix/MacOS:
-
-   ```bash
-   source venv/bin/activate
-   ```
-
-3. Install dependencies:
-
-```bash
+source venv/bin/activate  # Для Windows: venv\Scripts\activate
 pip install -r requirements.txt
-```
-
-## Running the API
-
-Start the API server with:
-
-```bash
 python main.py
 ```
 
-The API will be available at http://localhost:8000
+#### Запуск фронтенда:
 
-You can access the interactive API documentation at:
+```
+cd threat-detector-frontend
+npm install
+npm run serve
+```
 
-- Swagger UI: http://localhost:8000/docs
-- ReDoc: http://localhost:8000/redoc
+## Деплой на Render
+
+1. Зарегистрируйтесь на [Render](https://render.com) и подключите свой GitHub репозиторий.
+
+2. Создайте новый Web Service и выберите опцию "Deploy from a Blueprint".
+
+3. Укажите путь к файлу `render.yaml` в вашем репозитории.
+
+4. Нажмите "Apply" и дождитесь завершения деплоя.
+
+5. Приложение будет доступно по предоставленному Render URL (обычно что-то вроде https://threatdetector.onrender.com).
+
+## Структура проекта
+
+- `threat-detector-frontend/` - Vue.js фронтенд
+- `threat-detector-backend/` - FastAPI бэкенд
+- `Dockerfile` - Единый Docker образ, содержащий фронтенд и бэкенд
+- `docker-compose.yml` - Конфигурация для локальной разработки
+- `render.yaml` - Конфигурация для деплоя на Render
+- `nginx.conf` - Конфигурация Nginx для объединения фронтенда и бэкенда
+- `start-services.sh` - Скрипт для запуска сервисов в Docker контейнере
 
 ## API Endpoints
 
-- `GET /`: Welcome message
-- `POST /api/file/check`: Check if a file is malicious
-- `POST /api/url/check`: Check if a URL is malicious
+- `GET /api/` - Приветственное сообщение API
+- `POST /api/file/check` - Проверка файла на наличие вредоносного кода
+- `POST /api/url/check` - Проверка URL на потенциальные угрозы
+
+Интерактивная документация API доступна по адресам:
+
+- Swagger UI: `/docs`
+- ReDoc: `/redoc`

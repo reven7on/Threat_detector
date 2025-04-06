@@ -1,7 +1,9 @@
 import axios from "axios";
 
-// Use localhost for development, can be changed for production
-const API_URL = "http://localhost:8000/api";
+// Определяем API URL в зависимости от окружения
+// В production все запросы идут на тот же домен (через Nginx)
+const isProd = process.env.NODE_ENV === "production";
+const API_URL = isProd ? "/api" : "http://localhost:8000/api";
 
 const api = axios.create({
   baseURL: API_URL,
