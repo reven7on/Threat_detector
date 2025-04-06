@@ -4,9 +4,7 @@ services:
     name: threatdetector
     env: docker
     plan: free
-    # Настройки для автоматического деплоя из GitHub
-    buildCommand: docker build -t threatdetector .
-    startCommand: docker run -p $PORT:80 threatdetector
+    dockerfilePath: ./Dockerfile # Укажем путь к Dockerfile
     envVars:
       - key: DOCKER_ENV
         value: true

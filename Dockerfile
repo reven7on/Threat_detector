@@ -40,12 +40,16 @@ COPY threat-detector-backend/ ./
 # Копируем конфигурацию nginx
 COPY nginx.conf /etc/nginx/sites-available/default
 
-# Создаем запускающий скрипт
+# Создаем запускающий скрипт с поддержкой переменной PORT
 COPY start-services.sh /app/
 RUN chmod +x /app/start-services.sh
 
-# Открываем порт для приложения
-EXPOSE 80
+# Переменная PORT может быть переопределена при запуске контейнера
+# По умолчанию используем порт 80
+ENV PORT=80
+
+# Открываем порт, который будет использоваться (настраивается через ENV)
+EXPOSE $PORT
 
 # Запускаем nginx и Python приложение
 CMD ["/app/start-services.sh"] 
