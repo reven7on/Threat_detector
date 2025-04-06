@@ -25,7 +25,7 @@ COPY threat-detector-backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Копируем весь код бэкенда
-COPY threat-detector-backend/ ./
+COPY threat-detector-backend/ .
 
 # Копируем собранный фронтенд в static директорию FastAPI
 COPY --from=frontend-build /app/frontend/dist /app/static

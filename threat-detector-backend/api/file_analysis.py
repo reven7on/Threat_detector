@@ -1,6 +1,6 @@
 from fastapi import APIRouter, UploadFile, HTTPException
 from fastapi.responses import JSONResponse
-from services.file_analyzer import FileAnalyzer
+from models.file_analyzer import FileAnalyzer
 import tempfile
 import os
 from typing import Optional
