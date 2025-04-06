@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: threat-detector
+    env: docker
+    dockerfilePath: ./docker-compose.yml
+    dockerCommand: docker-compose up
+    plan: free
+    autoDeploy: true
+    envVars:
+      - key: PORT
+        value: 10000
+    healthCheckPath: /

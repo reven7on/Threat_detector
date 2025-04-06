@@ -15,7 +15,7 @@ services:
     build: ./threat-detector-frontend
     container_name: threat-detector-frontend
     ports:
-      - "8080:8080"
+      - "10000:8080"
     volumes:
       - ./threat-detector-frontend:/app
     depends_on:
