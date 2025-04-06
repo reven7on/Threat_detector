@@ -4,12 +4,3 @@ services:
     name: threatdetector
     env: docker
     plan: free
-    # Определяем путь к Dockerfile
-    dockerfile: Dockerfile
-    # Указываем переменные окружения
-    envVars:
-      - key: DOCKER_ENV
-        value: "true"
-      - key: BACKEND_CORS_ORIGINS
-        value: '["https://threatdetector.onrender.com", "https://*.render.com"]'
-    healthCheckPath: /
