@@ -1,8 +1,10 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import JSONResponse
 import uvicorn
 import os
+import asyncio
 from api import file_analysis, url_analysis
 
 # Создаем приложение FastAPI
@@ -16,6 +18,17 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Добавляем middleware для таймаутов
+@app.middleware("http")
+async def timeout_middleware(request: Request, call_next):
+    try:
+        return await asyncio.wait_for(call_next(request), timeout=60.0)
+    except asyncio.TimeoutError:
+        return JSONResponse(
+            status_code=408,
+            content={"error": "Request timeout"}
+        )
 
 # API маршруты
 @app.get("/api")

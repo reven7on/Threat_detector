@@ -1,53 +1,57 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException
-import os
+from fastapi import APIRouter, UploadFile, HTTPException
+from fastapi.responses import JSONResponse
+from services.file_analyzer import FileAnalyzer
 import tempfile
-from models.file_analyzer import FileAnalyzer
+import os
+from typing import Optional
+import asyncio
 
 router = APIRouter()
-file_analyzer = FileAnalyzer()  # Initialize the analyzer
+MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
+CHUNK_SIZE = 1024 * 1024  # 1MB chunks
+TIMEOUT = 30  # 30 seconds timeout
 
 @router.post("/check")
-async def check_file(file: UploadFile = File(...)):
-    """
-    Check if a file is malicious.
-    Uses a placeholder implementation for now.
-    """
-    print(f"Received file for analysis: {file.filename}")
+async def check_file(file: UploadFile):
+    if not file:
+        raise HTTPException(status_code=400, detail="No file provided")
     
+    # Проверяем размер файла
+    file_size = 0
+    temp_file = None
     try:
-        # Save the file temporarily
+        # Создаем временный файл
         temp_file = tempfile.NamedTemporaryFile(delete=False)
+        temp_path = temp_file.name
         
-        # Простое чтение файла целиком
-        contents = await file.read()
-        temp_file.write(contents)
+        # Читаем файл по частям и проверяем размер
+        while chunk := await file.read(CHUNK_SIZE):
+            file_size += len(chunk)
+            if file_size > MAX_FILE_SIZE:
+                raise HTTPException(status_code=413, detail="File too large")
+            temp_file.write(chunk)
+        
         temp_file.close()
         
-        # Analyze the file using our placeholder model
-        print(f"Analyzing file: {file.filename}")
-        result = file_analyzer.analyze(temp_file.name)
-        
-        # Add filename to the result
-        result["filename"] = file.filename
-        
-        # Clean up the temporary file
+        # Запускаем анализ с таймаутом
         try:
-            os.unlink(temp_file.name)
-        except Exception:
-            pass
-        
-        return result
+            result = await asyncio.wait_for(
+                FileAnalyzer().analyze_file(temp_path),
+                timeout=TIMEOUT
+            )
+            return JSONResponse(content=result)
+        except asyncio.TimeoutError:
+            raise HTTPException(status_code=408, detail="Analysis timeout")
+            
     except Exception as e:
-        # Make sure temp file is cleaned up in case of error
-        if 'temp_file' in locals() and os.path.exists(temp_file.name):
+        return JSONResponse(
+            status_code=500,
+            content={"error": str(e)}
+        )
+    finally:
+        # Очищаем временный файл
+        if temp_file and os.path.exists(temp_path):
             try:
-                os.unlink(temp_file.name)
-            except Exception:
-                pass
-        
-        # Return a more detailed error response
-        print(f"Error analyzing file: {str(e)}")
-        raise HTTPException(
-            status_code=500, 
-            detail=f"Error analyzing file: {str(e)}"
-        ) 
+                os.unlink(temp_path)
+            except:
+                pass 
