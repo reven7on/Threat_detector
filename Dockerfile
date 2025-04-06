@@ -18,19 +18,18 @@ RUN npm run build
 # Этап подготовки бэкенда и финального образа
 FROM python:3.9-slim
 
-WORKDIR /app
-
-# Устанавливаем nginx для раздачи статики фронтенда
-RUN apt-get update && apt-get install -y nginx && \
+# Устанавливаем nginx и другие полезные утилиты для отладки
+RUN apt-get update && apt-get install -y nginx procps vim nano curl && \
     rm -rf /var/lib/apt/lists/*
 
 # Копируем сборку фронтенда из предыдущего этапа
 COPY --from=frontend-build /app/frontend/dist /var/www/html
 
-# Копируем файлы зависимостей бэкенда
-COPY threat-detector-backend/requirements.txt .
+# Создаем рабочую директорию для приложения
+WORKDIR /app
 
-# Устанавливаем зависимости бэкенда
+# Копируем файл зависимостей бэкенда и устанавливаем их
+COPY threat-detector-backend/requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
@@ -40,16 +39,16 @@ COPY threat-detector-backend/ ./
 # Копируем конфигурацию nginx
 COPY nginx.conf /etc/nginx/sites-available/default
 
-# Создаем запускающий скрипт с поддержкой переменной PORT
-COPY start-services.sh /app/
-RUN chmod +x /app/start-services.sh
+# Копируем скрипты
+COPY start-services.sh /
+COPY debug-render.sh /
+RUN chmod +x /start-services.sh /debug-render.sh
 
 # Переменная PORT может быть переопределена при запуске контейнера
-# По умолчанию используем порт 80
 ENV PORT=80
 
-# Открываем порт, который будет использоваться (настраивается через ENV)
+# Открываем порт
 EXPOSE $PORT
 
-# Запускаем nginx и Python приложение
-CMD ["/app/start-services.sh"] 
+# Использовать упрощенный подход к запуску для Render
+CMD ["/bin/sh", "/start-services.sh"] 

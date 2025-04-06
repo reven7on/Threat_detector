@@ -1,4 +1,9 @@
-#!/bin/bash
+#!/bin/sh
+# Используем /bin/sh вместо /bin/bash для лучшей совместимости
+
+# Показываем все выполняемые команды (для отладки)
+set -x
+# Прервать выполнение при любой ошибке
 set -e
 
 # Получаем порт из переменной окружения PORT или используем 80 по умолчанию
@@ -8,6 +13,7 @@ PORT=${PORT:-80}
 echo "Starting services on port $PORT..."
 echo "Current directory: $(pwd)"
 echo "Files in current directory: $(ls -la)"
+echo "Process environment: $(env)"
 
 # Динамически создаем конфигурацию для Nginx, заменяя порт
 echo "Configuring Nginx to listen on port $PORT..."
@@ -35,10 +41,12 @@ if kill -0 $NGINX_PID 2>/dev/null; then
     echo "Nginx is running with PID $NGINX_PID"
 else
     echo "ERROR: Nginx failed to start"
+    cat /var/log/nginx/error.log || echo "Could not read Nginx error log"
     exit 1
 fi
 
 # Запускаем FastAPI бэкенд
 echo "Starting FastAPI backend..."
-cd /app
+# Предотвращаем проблемы с путями
+cd "$(dirname "$0")" || cd /app
 exec python main.py 
