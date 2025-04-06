@@ -15,17 +15,9 @@ COPY threat-detector-frontend/ ./
 # Собираем фронтенд для production
 RUN npm run build
 
-# Этап подготовки бэкенда и финального образа
+# Финальный этап - только бэкенд
 FROM python:3.9-slim
 
-# Устанавливаем nginx
-RUN apt-get update && apt-get install -y nginx && \
-    rm -rf /var/lib/apt/lists/*
-
-# Копируем сборку фронтенда из предыдущего этапа
-COPY --from=frontend-build /app/frontend/dist /var/www/html
-
-# Рабочая директория для бэкенда
 WORKDIR /app
 
 # Копируем файл зависимостей бэкенда и устанавливаем их
@@ -35,18 +27,15 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Копируем весь код бэкенда
 COPY threat-detector-backend/ ./
 
-# Копируем конфигурацию nginx
-COPY nginx.conf /etc/nginx/sites-available/default
+# Копируем собранный фронтенд в static директорию FastAPI
+COPY --from=frontend-build /app/frontend/dist /app/static
 
-# Скрипт запуска сервисов
-RUN echo '#!/bin/bash \n\
-    nginx \n\
-    cd /app \n\
-    python main.py' > /start.sh && \
-    chmod +x /start.sh
+# Обновляем main.py чтобы он также обслуживал статические файлы
+RUN echo "from fastapi.staticfiles import StaticFiles\n\
+    app.mount(\"/\", StaticFiles(directory=\"static\", html=True), name=\"static\")" >> main.py
 
-# Открываем порт
-EXPOSE 80
+# Открываем порт для Render
+ENV PORT=10000
 
-# Запускаем сервисы
-CMD ["bash", "/start.sh"] 
+# Запускаем FastAPI приложение
+CMD uvicorn main:app --host 0.0.0.0 --port $PORT 

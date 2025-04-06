@@ -4,3 +4,7 @@ services:
     name: threatdetector
     env: docker
     plan: free
+    # Указываем порт для приложения
+    envVars:
+      - key: PORT
+        value: 10000
