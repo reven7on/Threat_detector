@@ -1,12 +1,14 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 import uvicorn
 import os
 from api import file_analysis, url_analysis
 
+# Создаем приложение FastAPI
 app = FastAPI(title="ThreatDetector API")
 
-# Configure CORS
+# Настраиваем CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # В продакшене следует ограничить
@@ -15,18 +17,21 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Routes
+# API маршруты
 @app.get("/api")
 async def root():
     return {"message": "Welcome to ThreatDetector API"}
 
-# Include routers - обратите внимание, мы изменили префикс без "api/"
+# Подключаем API роутеры
 app.include_router(file_analysis.router, prefix="/api/file", tags=["File Analysis"])
 app.include_router(url_analysis.router, prefix="/api/url", tags=["URL Analysis"])
 
-# Примечание: код для монтирования статических файлов будет добавлен в Dockerfile
-# app.mount("/", StaticFiles(directory="static", html=True), name="static")
+# Монтируем статические файлы
+# Это нужно делать только если файлы существуют
+if os.path.exists("static"):
+    app.mount("/", StaticFiles(directory="static", html=True), name="static")
 
+# Запуск приложения
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
     uvicorn.run("main:app", host="0.0.0.0", port=port) 

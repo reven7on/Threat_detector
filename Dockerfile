@@ -30,10 +30,6 @@ COPY threat-detector-backend/ ./
 # Копируем собранный фронтенд в static директорию FastAPI
 COPY --from=frontend-build /app/frontend/dist /app/static
 
-# Обновляем main.py чтобы он также обслуживал статические файлы
-RUN echo "from fastapi.staticfiles import StaticFiles\n\
-    app.mount(\"/\", StaticFiles(directory=\"static\", html=True), name=\"static\")" >> main.py
-
 # Открываем порт для Render
 ENV PORT=10000
 
