@@ -1,0 +1,17 @@
+version: '3'
+
+services:
+  # Единое приложение, содержащее фронтенд и бэкенд
+  threatdetector:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: threatdetector-app
+    ports:
+      - "80:80"
+    environment:
+      - DOCKER_ENV=true
+      - BACKEND_CORS_ORIGINS=["http://localhost:80", "http://localhost", "https://*.render.com"]
+    volumes:
+      # Монтируем код для разработки (опционально)
+      - ./threat-detector-backend:/app:ro
