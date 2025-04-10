@@ -25,30 +25,74 @@ class URLAnalyzer:
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         models_dir = os.path.join(base_dir, "models")
         
+        # Списки возможных путей для поиска файлов моделей
+        model_paths = []
+        model_info_paths = []
+        
+        # Добавляем стандартные пути
         if model_path is None:
-            model_path = os.path.join(models_dir, "phishing_detection_model.pkl")
+            model_paths = [
+                os.path.join(models_dir, "phishing_detection_model.pkl"),  # Стандартный путь
+                "/app/models/phishing_detection_model.pkl",  # Путь в Docker контейнере
+                os.path.join("/app", "phishing_detection_model.pkl")  # Альтернативный путь
+            ]
+        else:
+            model_paths.append(model_path)
         
         if model_info_path is None:
-            model_info_path = os.path.join(models_dir, "phishing_model_info.pkl")
+            model_info_paths = [
+                os.path.join(models_dir, "phishing_model_info.pkl"),  # Стандартный путь
+                "/app/models/phishing_model_info.pkl",  # Путь в Docker контейнере
+                os.path.join("/app", "phishing_model_info.pkl")  # Альтернативный путь
+            ]
+        else:
+            model_info_paths.append(model_info_path)
         
-        # Загрузка модели и информации о модели
-        try:
-            with open(model_path, 'rb') as f:
-                self.model = pickle.load(f)
-            
-            with open(model_info_path, 'rb') as f:
-                self.model_info = pickle.load(f)
-            
+        # Загрузка модели, перебираем все возможные пути
+        model_loaded = False
+        model_info_loaded = False
+        model_error = None
+        model_info_error = None
+        
+        # Пытаемся загрузить файл модели
+        for path in model_paths:
+            try:
+                print(f"Пытаемся загрузить модель из: {path}")
+                with open(path, 'rb') as f:
+                    self.model = pickle.load(f)
+                    model_loaded = True
+                    print(f"Модель успешно загружена из: {path}")
+                    break
+            except Exception as e:
+                model_error = e
+                print(f"Не удалось загрузить модель из {path}: {e}")
+        
+        # Пытаемся загрузить информацию о модели
+        for path in model_info_paths:
+            try:
+                print(f"Пытаемся загрузить информацию о модели из: {path}")
+                with open(path, 'rb') as f:
+                    self.model_info = pickle.load(f)
+                    model_info_loaded = True
+                    print(f"Информация о модели успешно загружена из: {path}")
+                    break
+            except Exception as e:
+                model_info_error = e
+                print(f"Не удалось загрузить информацию о модели из {path}: {e}")
+        
+        # Проверяем, удалось ли загрузить все необходимые файлы
+        if model_loaded and model_info_loaded:
             self.label_encoder = self.model_info['label_encoder']
             self.phishing_idx = self.model_info['phishing_idx']
             self.feature_names = self.model_info['feature_names']
             self.is_loaded = True
-            
             print(f"Модель успешно загружена. Распознаёт классы: {self.label_encoder.classes_}")
-            
-        except Exception as e:
+        else:
             self.is_loaded = False
-            print(f"Ошибка при загрузке модели: {e}")
+            if not model_loaded:
+                print(f"Ошибка при загрузке модели: {model_error}")
+            if not model_info_loaded:
+                print(f"Ошибка при загрузке информации о модели: {model_info_error}")
     
     def extract_features(self, url):
         """
