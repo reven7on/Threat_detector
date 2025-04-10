@@ -24,14 +24,14 @@ WORKDIR /app
 COPY threat-detector-backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Создаем директорию для моделей
+RUN mkdir -p /app/models
+
 # Копируем весь код бэкенда
 COPY threat-detector-backend/ .
 
-# Создаем директорию для моделей, если она еще не существует
-RUN mkdir -p /app/models
-
-# Пытаемся копировать модели, если они существуют
-RUN find /app/models -name "*.pkl" -exec cp {} /app/models/ \; || true
+# Показываем содержимое директорий для отладки
+RUN echo "Содержимое /app/models:" && ls -la /app/models
 
 # Копируем собранный фронтенд в static директорию FastAPI
 COPY --from=frontend-build /app/frontend/dist /app/static

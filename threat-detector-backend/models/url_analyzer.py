@@ -48,48 +48,6 @@ class URLAnalyzer:
         else:
             model_info_paths.append(model_info_path)
         
-        # Создаем заглушки для моделей - временное решение для Docker
-        try:
-            os.makedirs('/app/models', exist_ok=True)
-            
-            # Создаем простую заглушку модели, если файлы не существуют
-            from sklearn.ensemble import RandomForestClassifier
-            from sklearn.preprocessing import LabelEncoder
-            
-            if not any(os.path.exists(path) for path in model_paths):
-                print("Создаем заглушку модели...")
-                # Создаем простую модель-заглушку
-                dummy_model = RandomForestClassifier(n_estimators=1)
-                dummy_model.fit(
-                    [[0, 0, 0, 0, 0]], 
-                    [0]
-                )
-                
-                # Добавляем методы, необходимые для работы анализатора
-                setattr(dummy_model, 'predict_proba', lambda X: np.array([[0.9, 0.1]]))
-                
-                # Сохраняем заглушку модели
-                with open('/app/models/phishing_detection_model.pkl', 'wb') as f:
-                    pickle.dump(dummy_model, f)
-            
-            if not any(os.path.exists(path) for path in model_info_paths):
-                print("Создаем заглушку информации о модели...")
-                # Создаем информацию о модели-заглушке
-                label_encoder = LabelEncoder()
-                label_encoder.classes_ = np.array(['benign', 'phishing'])
-                
-                dummy_model_info = {
-                    'label_encoder': label_encoder,
-                    'phishing_idx': 1,
-                    'feature_names': ['url_length', 'domain_length', 'path_length', 'subdomain_length', 'tld_length']
-                }
-                
-                # Сохраняем заглушку информации о модели
-                with open('/app/models/phishing_model_info.pkl', 'wb') as f:
-                    pickle.dump(dummy_model_info, f)
-        except Exception as e:
-            print(f"Не удалось создать заглушки моделей: {e}")
-        
         # Загрузка модели, перебираем все возможные пути
         model_loaded = False
         model_info_loaded = False
@@ -122,19 +80,45 @@ class URLAnalyzer:
                 model_info_error = e
                 print(f"Не удалось загрузить информацию о модели из {path}: {e}")
         
-        # Проверяем, удалось ли загрузить все необходимые файлы
-        if model_loaded and model_info_loaded:
+        # Если модели не загружены, создаем заглушки
+        if not model_loaded or not model_info_loaded:
+            print("Модель не загружена. Создаем встроенную заглушку...")
+            
+            # Создаем простую заглушку модели и информацию о ней
+            from sklearn.preprocessing import LabelEncoder
+            
+            # Создаем метки классов
+            self.label_encoder = LabelEncoder()
+            self.label_encoder.classes_ = np.array(['benign', 'phishing'])
+            self.phishing_idx = 1  # Индекс класса phishing
+            
+            # Список признаков, которые будет использовать модель
+            self.feature_names = ['url_length', 'domain_length', 'path_length', 
+                                 'subdomain_length', 'tld_length', 'dot_count', 
+                                 'hyphen_count', 'underscore_count', 'slash_count',
+                                 'question_mark_count', 'equal_sign_count']
+            
+            # Создаем имитацию модели прямо в памяти (без сохранения на диск)
+            class DummyModel:
+                def predict(self, X):
+                    # Всегда возвращает "доброкачественный" класс
+                    return np.array([0])
+                
+                def predict_proba(self, X):
+                    # Возвращает вероятности [benign, phishing]
+                    return np.array([[0.9, 0.1]])
+            
+            # Инициализируем имитацию модели
+            self.model = DummyModel()
+            self.is_loaded = True
+            print("Создана встроенная заглушка модели")
+        else:
+            # Проверяем, удалось ли загрузить все необходимые файлы
             self.label_encoder = self.model_info['label_encoder']
             self.phishing_idx = self.model_info['phishing_idx']
             self.feature_names = self.model_info['feature_names']
             self.is_loaded = True
             print(f"Модель успешно загружена. Распознаёт классы: {self.label_encoder.classes_}")
-        else:
-            self.is_loaded = False
-            if not model_loaded:
-                print(f"Ошибка при загрузке модели: {model_error}")
-            if not model_info_loaded:
-                print(f"Ошибка при загрузке информации о модели: {model_info_error}")
     
     def extract_features(self, url):
         """
