@@ -20,6 +20,11 @@ FROM python:3.9-slim
 
 WORKDIR /app
 
+# Устанавливаем системные зависимости, необходимые для LightGBM и других библиотек
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
 # Копируем файл зависимостей бэкенда и устанавливаем их
 COPY threat-detector-backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
