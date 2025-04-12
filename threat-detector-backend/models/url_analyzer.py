@@ -6,11 +6,12 @@ import re
 import math
 import tldextract
 import os
+import traceback
 
 class URLAnalyzer:
     """
-    Класс для анализа URL-адресов на предмет фишинга и вредоносных сайтов
-    с использованием предобученной модели машинного обучения.
+    Класс для анализа URL-адресов на предмет фишинга
+    с использованием бинарной классификационной модели (0 - безопасный, 1 - фишинг).
     """
     
     def __init__(self, model_path=None, model_info_path=None):
@@ -18,135 +19,192 @@ class URLAnalyzer:
         Инициализация анализатора URL
         
         Args:
-            model_path (str): Путь к файлу модели LightGBM
+            model_path (str): Путь к файлу модели
             model_info_path (str): Путь к файлу с информацией о модели
         """
         # Определение путей к файлам модели
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         models_dir = os.path.join(base_dir, "models")
         
-        # Списки возможных путей для поиска файлов моделей
-        model_paths = []
-        model_info_paths = []
-        
-        # Добавляем стандартные пути
+        # Устанавливаем значения по умолчанию, если пути не указаны
         if model_path is None:
-            model_paths = [
-                os.path.join(models_dir, "phishing_detection_model.pkl"),  # Стандартный путь
-                "/app/models/phishing_detection_model.pkl",  # Путь в Docker контейнере
-                os.path.join("/app", "phishing_detection_model.pkl")  # Альтернативный путь
-            ]
-        else:
-            model_paths.append(model_path)
+            model_path = os.path.join(models_dir, "binary_phishing_detection_model.pkl")
         
         if model_info_path is None:
-            model_info_paths = [
-                os.path.join(models_dir, "phishing_model_info.pkl"),  # Стандартный путь
-                "/app/models/phishing_model_info.pkl",  # Путь в Docker контейнере
-                os.path.join("/app", "phishing_model_info.pkl")  # Альтернативный путь
-            ]
-        else:
-            model_info_paths.append(model_info_path)
+            model_info_path = os.path.join(models_dir, "binary_phishing_model_info.pkl")
         
-        # Загрузка модели, перебираем все возможные пути
-        model_loaded = False
-        model_info_loaded = False
-        model_error = None
-        model_info_error = None
+        # Инициализация свойств по умолчанию
+        self.model = None
+        self.model_info = None
+        self.is_loaded = False
+        self.class_names = ['0 (Безопасный)', '1 (Фишинг)']  # Имена по умолчанию для бинарной модели
+        self.phishing_class_index = 1  # Индекс класса фишинга (по умолчанию 1)
+        self.feature_names = []  # Имена признаков будут загружены из model_info
         
-        # Пытаемся загрузить файл модели
-        for path in model_paths:
-            try:
-                print(f"Пытаемся загрузить модель из: {path}")
-                with open(path, 'rb') as f:
-                    self.model = pickle.load(f)
-                    model_loaded = True
-                    print(f"Модель успешно загружена из: {path}")
-                    break
-            except Exception as e:
-                model_error = e
-                print(f"Не удалось загрузить модель из {path}: {e}")
-        
-        # Пытаемся загрузить информацию о модели
-        for path in model_info_paths:
-            try:
-                print(f"Пытаемся загрузить информацию о модели из: {path}")
-                with open(path, 'rb') as f:
-                    self.model_info = pickle.load(f)
-                    model_info_loaded = True
-                    print(f"Информация о модели успешно загружена из: {path}")
-                    break
-            except Exception as e:
-                model_info_error = e
-                print(f"Не удалось загрузить информацию о модели из {path}: {e}")
-        
-        # Если модели не загружены, создаем заглушки
-        if not model_loaded or not model_info_loaded:
-            print("Модель не загружена. Создаем встроенную заглушку...")
+        # Попытка загрузки модели и информации
+        try:
+            print(f"Загрузка модели из: {model_path}")
+            with open(model_path, 'rb') as f:
+                self.model = pickle.load(f)
             
-            # Создаем простую заглушку модели и информацию о ней
-            from sklearn.preprocessing import LabelEncoder
+            print(f"Загрузка информации о модели из: {model_info_path}")
+            with open(model_info_path, 'rb') as f:
+                self.model_info = pickle.load(f)
             
-            # Создаем метки классов
-            self.label_encoder = LabelEncoder()
-            self.label_encoder.classes_ = np.array(['benign', 'phishing'])
-            self.phishing_idx = 1  # Индекс класса phishing
+            # Извлечение информации из model_info
+            if 'classes' in self.model_info:
+                self.class_names = self.model_info['classes']
+                self.phishing_class_index = self.model_info.get('phishing_class_index', 1)
             
-            # Список признаков, которые будет использовать модель
-            self.feature_names = ['url_length', 'domain_length', 'path_length', 
-                                 'subdomain_length', 'tld_length', 'dot_count', 
-                                 'hyphen_count', 'underscore_count', 'slash_count',
-                                 'question_mark_count', 'equal_sign_count']
+            # Загрузка имен признаков
+            self.feature_names = self.model_info.get('feature_names', [])
             
-            # Создаем имитацию модели прямо в памяти (без сохранения на диск)
-            class DummyModel:
-                def predict(self, X):
-                    # Всегда возвращает "доброкачественный" класс
-                    return np.array([0])
-                
-                def predict_proba(self, X):
-                    # Возвращает вероятности [benign, phishing]
-                    return np.array([[0.9, 0.1]])
-            
-            # Инициализируем имитацию модели
-            self.model = DummyModel()
             self.is_loaded = True
-            print("Создана встроенная заглушка модели")
-        else:
-            # Проверяем, удалось ли загрузить все необходимые файлы
-            self.label_encoder = self.model_info['label_encoder']
-            self.phishing_idx = self.model_info['phishing_idx']
-            self.feature_names = self.model_info['feature_names']
-            self.is_loaded = True
-            print(f"Модель успешно загружена. Распознаёт классы: {self.label_encoder.classes_}")
+            print(f"Модель успешно загружена. Распознаёт классы: {self.class_names}")
+            print(f"Загружено {len(self.feature_names)} признаков")
+            
+        except Exception as e:
+            print(f"ОШИБКА при загрузке модели: {e}")
+            print(traceback.format_exc())
+            self.is_loaded = False
     
-    def extract_features(self, url):
+    def analyze(self, url):
         """
-        Извлечение признаков из URL для анализа
+        Анализ URL на предмет угрозы
         
         Args:
             url (str): URL для анализа
             
         Returns:
-            DataFrame: Таблица с признаками
+            dict: Результаты анализа
         """
-        urls = pd.Series([url])
-        features = pd.DataFrame()
+        # Проверяем загружена ли модель
+        if not self.is_loaded or self.model is None:
+            return {
+                "error": "Model not loaded",
+                "url": url,
+                "is_malicious": False,
+                "confidence": 0.0,
+                "phishing_probability": 0.0,
+                "message": "URL analyzer model is not properly loaded"
+            }
         
-        # 1. Длина URL и его компонентов
-        features['url_length'] = urls.apply(len)
+        # Проверяем корректность URL
+        if not isinstance(url, str) or not url:
+            return {
+                "error": "Invalid input URL",
+                "url": url,
+                "is_malicious": False,
+                "confidence": 0.0,
+                "phishing_probability": 0.0,
+                "message": "Please provide a valid non-empty URL string."
+            }
+        
+        try:
+            # Нормализация URL перед извлечением признаков
+            normalized_url = re.sub(r'^https?://(www\.)?', '', url).rstrip('/')
+            
+            # Извлечение признаков
+            features_df = self.extract_features(pd.Series([normalized_url]))
+            
+            # Убедимся, что у нас есть все нужные признаки
+            for feature in self.feature_names:
+                if feature not in features_df.columns:
+                    features_df[feature] = 0
+            
+            # Выбираем только необходимые признаки в нужном порядке
+            features_df = features_df[self.feature_names]
+            
+            # Выполнение предсказания с явным преобразованием типов
+            pred_label_idx = int(self.model.predict(features_df)[0])
+            pred_prob = [float(p) for p in self.model.predict_proba(features_df)[0]]
+            
+            # Подготовка результата
+            phishing_probability = float(pred_prob[self.phishing_class_index]) if self.phishing_class_index < len(pred_prob) else 0.0
+            is_phishing = bool(pred_label_idx == self.phishing_class_index)
+            
+            # Сообщение в зависимости от класса угрозы
+            if is_phishing:
+                message = "Внимание! Этот URL может быть фишинговым сайтом."
+            else:
+                message = "URL кажется безопасным."
+            
+            # Формируем результат с гарантированно правильными типами данных
+            result = {
+                # Основные поля для фронтенда
+                "is_malicious": bool(is_phishing),
+                "confidence": float(pred_prob[pred_label_idx]),
+                "phishing_probability": float(phishing_probability),
+                "threat_type": "phishing" if is_phishing else "benign",
+                "url": str(url),
+                "message": str(message),
+                
+                # Дополнительные поля
+                "normalized_url": str(normalized_url),
+                "prediction_index": int(pred_label_idx),
+                "probabilities": {
+                    str(self.class_names[i]): float(prob) 
+                    for i, prob in enumerate(pred_prob)
+                }
+            }
+            
+            # Гарантируем отсутствие NumPy типов в результате
+            return self._convert_numpy_types(result)
+            
+        except Exception as e:
+            print(f"Ошибка при анализе URL '{url}': {e}")
+            print(traceback.format_exc())
+            
+            # Возвращаем ошибку в формате, который фронтенд может обработать
+            return {
+                "error": str(e),
+                "url": url,
+                "is_malicious": False,
+                "confidence": 0.0,
+                "phishing_probability": 0.0,
+                "message": "Произошла ошибка при анализе URL."
+            }
+    
+    def extract_features(self, urls):
+        """
+        Извлечение признаков из списка URL для задачи классификации.
+        
+        Args:
+            urls (pd.Series): Серия URL для анализа
+            
+        Returns:
+            pd.DataFrame: Датафрейм с признаками
+        """
+        features = pd.DataFrame()
         
         # Парсинг URL для извлечения компонентов
         parsed_urls = urls.apply(lambda x: urlparse(x))
         extracted = urls.apply(lambda x: tldextract.extract(x))
         
-        # 2. Домен и его компоненты
-        features['domain_length'] = parsed_urls.apply(lambda x: len(x.netloc) if x.netloc else 0)
-        features['path_length'] = parsed_urls.apply(lambda x: len(x.path) if x.path else 0)
-        features['subdomain_length'] = extracted.apply(lambda x: len(x.subdomain) if x.subdomain else 0)
-        features['tld_length'] = extracted.apply(lambda x: len(x.suffix) if x.suffix else 0)
+        # 1. use_of_ip - использование IP вместо домена
+        ip_pattern = re.compile(r'^(((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))')
+        features['has_ip_address'] = parsed_urls.apply(lambda x: 1 if ip_pattern.match(x.netloc) else 0)
         
-        # 3. Количество определенных символов и компонентов
+        # 2. abnormal_url - ненормальный URL (содержит @ или // после протокола)
+        features['abnormal_url'] = urls.apply(lambda x: 1 if '@' in x or re.search(r'https?://.*?//', x) else 0)
+        
+        # 3. url_length - длина URL
+        features['url_length'] = urls.apply(len)
+        
+        # 4. domain_length - длина домена
+        features['domain_length'] = parsed_urls.apply(lambda x: len(x.netloc) if x.netloc else 0)
+        
+        # 5. path_length - длина пути
+        features['path_length'] = parsed_urls.apply(lambda x: len(x.path) if x.path else 0)
+        
+        # 6. subdomain_length - длина субдомена
+        features['subdomain_length'] = extracted.apply(lambda x: len(x.subdomain) if x.subdomain else 0)
+        
+        # Получаем TLD (suffix)
+        tlds = extracted.apply(lambda x: x.suffix.lower() if x.suffix else None)
+        features['tld_length'] = tlds.apply(lambda x: len(x) if x else 0)
+        
+        # 7. Количество определенных символов и компонентов
         features['dot_count'] = urls.apply(lambda x: x.count('.'))
         features['hyphen_count'] = urls.apply(lambda x: x.count('-'))
         features['underscore_count'] = urls.apply(lambda x: x.count('_'))
@@ -165,15 +223,15 @@ class URLAnalyzer:
         features['dollar_count'] = urls.apply(lambda x: x.count('$'))
         features['percent_count'] = urls.apply(lambda x: x.count('%'))
         
-        # 4. Другие полезные счетчики
+        # 8. Другие полезные счетчики
         features['digit_count'] = urls.apply(lambda x: sum(c.isdigit() for c in x))
         features['letter_count'] = urls.apply(lambda x: sum(c.isalpha() for c in x))
         features['digit_letter_ratio'] = features['digit_count'] / (features['letter_count'] + 1)  # +1 чтобы избежать деления на 0
         
-        # 5. Количество параметров в запросе
+        # 9. Количество параметров в запросе
         features['param_count'] = parsed_urls.apply(lambda x: len(x.query.split('&')) if x.query else 0)
         
-        # 6. Энтропия URL (мера случайности символов)
+        # 10. Энтропия URL (мера случайности символов)
         def calculate_entropy(text):
             if not text:
                 return 0
@@ -189,7 +247,8 @@ class URLAnalyzer:
             
             for count in char_count.values():
                 probability = count / text_length
-                entropy -= probability * math.log2(probability)
+                if probability > 0:  # Избегаем log2(0)
+                    entropy -= probability * math.log2(probability)
             
             return entropy
         
@@ -197,103 +256,82 @@ class URLAnalyzer:
         features['domain_entropy'] = parsed_urls.apply(lambda x: calculate_entropy(x.netloc) if x.netloc else 0)
         features['path_entropy'] = parsed_urls.apply(lambda x: calculate_entropy(x.path) if x.path else 0)
         
-        # 7. Проверка на наличие IP-адреса вместо домена
-        ip_pattern = re.compile(r'^(((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))')
-        features['has_ip_address'] = parsed_urls.apply(lambda x: 1 if ip_pattern.match(x.netloc) else 0)
-        
-        # 8. Количество директорий в пути
+        # 11. Количество директорий в пути
         features['dir_count'] = parsed_urls.apply(lambda x: x.path.count('/') if x.path else 0)
         
-        # 9. Содержит ли URL определенные подозрительные слова
-        suspicious_words = ['login', 'signin', 'verify', 'banking', 'secure', 'account', 'password', 'pwd', 'security']
+        # 12. Содержит ли URL определенные подозрительные слова
+        suspicious_words = ['login', 'signin', 'verify', 'banking', 'secure', 'account', 'password', 'pwd', 'security', 'update', 'confirm', 'support']
         for word in suspicious_words:
             features[f'contains_{word}'] = urls.apply(lambda x: 1 if word in x.lower() else 0)
         
-        # 10. Статистика по доменным зонам
-        features['is_com'] = extracted.apply(lambda x: 1 if x.suffix == 'com' else 0)
-        features['is_org'] = extracted.apply(lambda x: 1 if x.suffix == 'org' else 0)
-        features['is_net'] = extracted.apply(lambda x: 1 if x.suffix == 'net' else 0)
-        features['is_info'] = extracted.apply(lambda x: 1 if x.suffix == 'info' else 0)
-        features['is_biz'] = extracted.apply(lambda x: 1 if x.suffix == 'biz' else 0)
-        features['is_ru'] = extracted.apply(lambda x: 1 if x.suffix == 'ru' else 0)
-        
-        # 11. Базовые признаки для URL фишинга и вредоносных сайтов
+        # 13. Базовые признаки для URL фишинга
         features['uses_https'] = urls.apply(lambda x: 1 if x.startswith('https://') else 0)
         features['is_shortened'] = urls.apply(lambda x: 1 if re.match(r'bit\.ly|goo\.gl|t\.co|tinyurl\.com|tr\.im|is\.gd|cli\.gs|ow\.ly|bit\.do', urlparse(x).netloc) else 0)
         
+        # 14. Признаки на основе TLD
+        common_tlds = ['com', 'org', 'net', 'edu', 'gov', 'uk', 'ca', 'de', 'jp', 'fr', 'au', 'us', 'ru', 'ch', 'it', 'nl', 'se', 'no', 'es', 'mil']
+        suspicious_tlds = ['xyz', 'top', 'club', 'site', 'online', 'info', 'tk', 'ml', 'ga', 'cf', 'gq', 'work', 'link', 'click', 'buzz', 'stream', 'loan', 'download', 'review', 'vip', 'icu', 'support', 'security']
+
+        for tld in common_tlds:
+            features[f'is_tld_{tld}'] = tlds.apply(lambda x: 1 if x == tld else 0)
+
+        features['is_suspicious_tld'] = tlds.apply(lambda x: 1 if x in suspicious_tlds else 0)
+        features['is_uncommon_tld'] = tlds.apply(lambda x: 1 if x and x not in common_tlds else 0)
+        features['is_cctld'] = tlds.apply(lambda x: 1 if x and len(x) == 2 and x.isalpha() else 0)
+        
         return features
     
-    def analyze(self, url):
+    def _convert_numpy_types(self, obj):
         """
-        Анализ URL на предмет угрозы
+        Рекурсивно преобразует numpy типы в стандартные типы Python
+        для безопасной сериализации в JSON.
         
         Args:
-            url (str): URL для анализа
+            obj: Объект любого типа для конвертации
             
         Returns:
-            dict: Результаты анализа
+            Объект с преобразованными типами данных
         """
-        if not self.is_loaded:
-            return {
-                "error": "Model not loaded",
-                "url": url,
-                "message": "URL analyzer model is not properly loaded"
-            }
-        
-        try:
-            # Извлечение признаков
-            features_df = self.extract_features(url)
-            
-            # Убедимся, что у нас есть все нужные признаки в правильном порядке
-            missing_features = set(self.feature_names) - set(features_df.columns)
-            if missing_features:
-                for feature in missing_features:
-                    features_df[feature] = 0  # Заполняем отсутствующие признаки нулями
-            
-            # Выбираем только необходимые признаки в нужном порядке
-            features_df = features_df[self.feature_names]
-            
-            # Выполнение предсказания
-            pred_label = self.model.predict(features_df)
-            pred_prob = self.model.predict_proba(features_df)
-            
-            # Подготовка результата
-            predicted_class = self.label_encoder.inverse_transform(pred_label)[0]
-            phishing_prob = pred_prob[0][self.phishing_idx]
-            is_malicious = predicted_class != 'benign'
-            
-            # Определяем сообщение в зависимости от класса угрозы
-            if is_malicious:
-                if predicted_class == 'phishing':
-                    message = "Внимание! Этот URL может быть фишинговым сайтом."
-                elif predicted_class == 'malware':
-                    message = "Внимание! Этот URL может содержать вредоносное ПО."
-                else:
-                    message = f"Внимание! Обнаружена угроза: {predicted_class}"
-            else:
-                message = "URL кажется безопасным."
-            
-            # Формируем результат
-            result = {
-                "is_malicious": is_malicious,
-                "threat_type": predicted_class,
-                "confidence": float(pred_prob[0][pred_label[0]]),
-                "phishing_probability": float(phishing_prob),
-                "url": url,
-                "message": message,
-                "probabilities": {
-                    class_name: float(pred_prob[0][i]) 
-                    for i, class_name in enumerate(self.label_encoder.classes_)
-                }
-            }
-            
-            return result
-            
-        except Exception as e:
-            import traceback
-            return {
-                "error": str(e),
-                "url": url,
-                "message": "An error occurred during URL analysis",
-                "traceback": traceback.format_exc()
-            }
+        if isinstance(obj, dict):
+            return {k: self._convert_numpy_types(v) for k, v in obj.items()}
+        elif isinstance(obj, list) or isinstance(obj, tuple):
+            return [self._convert_numpy_types(x) for x in obj]
+        elif isinstance(obj, np.integer):
+            return int(obj)
+        elif isinstance(obj, np.floating):
+            return float(obj)
+        elif isinstance(obj, np.ndarray):
+            return obj.tolist()
+        elif isinstance(obj, np.bool_):
+            return bool(obj)
+        else:
+            return obj
+
+
+# Пример использования (если запускать файл напрямую)
+if __name__ == "__main__":
+    analyzer = URLAnalyzer()
+    
+    test_urls = [
+        "google.com",
+        "https://www.google.com/",
+        "facebook.com/login", 
+        "paypa1-secure.com/login",
+        "bit.ly/2Vxn3ad",
+        "https://verify-your-account-apple.com/login",
+        "youtube.com",
+        "amazon.com",
+        "banking-secure-login.com",
+        "update-your-password.net"
+    ]
+    
+    print("\nТестирование анализатора URL...")
+    for url in test_urls:
+        result = analyzer.analyze(url)
+        print("\n" + "="*50)
+        print(f"URL: {url}")
+        print(f"Нормализованный URL: {result.get('normalized_url', 'N/A')}")
+        print(f"Предсказание: {'Фишинг' if result.get('is_malicious') else 'Безопасный'}")
+        print(f"Уверенность: {result.get('confidence', 0):.4f}")
+        print(f"Вероятность фишинга: {result.get('phishing_probability', 0):.4f}")
+        print(f"Сообщение: {result.get('message', 'N/A')}")
