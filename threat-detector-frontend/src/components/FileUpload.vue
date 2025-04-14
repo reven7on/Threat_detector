@@ -13,6 +13,11 @@
         <button @click="$refs.fileInput.click()" class="btn glow-button">
           <i class="fas fa-file-upload me-2"></i>Select File
         </button>
+        <p class="file-type-hint mt-2">
+          <i class="fas fa-info-circle me-1"></i>
+          Supported file types: Portable Executable (PE) files (.exe, .dll,
+          .sys, .ocx, .scr)
+        </p>
       </div>
       <div v-else class="selected-file">
         <p><i class="fas fa-file me-2"></i>{{ selectedFile.name }}</p>
@@ -38,7 +43,14 @@
       ref="fileInput"
       @change="handleFileSelect"
       style="display: none"
+      accept=".exe,.dll,.sys,.ocx,.scr"
     />
+
+    <!-- Error message for invalid file type -->
+    <div v-if="fileTypeError" class="alert alert-danger mt-3">
+      <i class="fas fa-exclamation-triangle me-2"></i>
+      <strong>Invalid file type:</strong> {{ fileTypeError }}
+    </div>
 
     <!-- Progress indicator (visible during analysis) -->
     <div v-if="isAnalyzing" class="analysis-progress">
@@ -142,6 +154,7 @@ export default {
     const isAnalyzing = ref(false);
     const result = ref(null);
     const error = ref(null);
+    const fileTypeError = ref(null);
     const progressValue = ref(0);
     const progressInterval = ref(null);
 
@@ -176,20 +189,48 @@ export default {
       progressValue.value = 100;
     };
 
+    const isPEFile = (file) => {
+      // Проверяем расширение файла
+      const validExtensions = [".exe", ".dll", ".sys", ".ocx", ".scr"];
+      const fileName = file.name.toLowerCase();
+      return validExtensions.some((ext) => fileName.endsWith(ext));
+    };
+
     const handleFileSelect = (event) => {
-      selectedFile.value = event.target.files[0];
+      const file = event.target.files[0];
+      fileTypeError.value = null;
+
+      if (file && !isPEFile(file)) {
+        fileTypeError.value =
+          "Only PE files (.exe, .dll, .sys, .ocx, .scr) are supported";
+        selectedFile.value = null;
+        return;
+      }
+
+      selectedFile.value = file;
       result.value = null;
     };
 
     const handleFileDrop = (event) => {
       isDragOver.value = false;
-      selectedFile.value = event.dataTransfer.files[0];
+      const file = event.dataTransfer.files[0];
+      fileTypeError.value = null;
+
+      if (file && !isPEFile(file)) {
+        fileTypeError.value =
+          "Only PE files (.exe, .dll, .sys, .ocx, .scr) are supported";
+        selectedFile.value = null;
+        return;
+      }
+
+      selectedFile.value = file;
       result.value = null;
     };
 
     const clearFile = () => {
       selectedFile.value = null;
       result.value = null;
+      fileTypeError.value = null;
       if (document.querySelector("input[type=file]")) {
         document.querySelector("input[type=file]").value = "";
       }
@@ -198,6 +239,12 @@ export default {
     const analyzeFile = async () => {
       if (!selectedFile.value) return;
 
+      if (!isPEFile(selectedFile.value)) {
+        fileTypeError.value =
+          "Only PE files (.exe, .dll, .sys, .ocx, .scr) are supported";
+        return;
+      }
+
       isAnalyzing.value = true;
       result.value = null;
       startProgressBar();
@@ -205,6 +252,11 @@ export default {
       try {
         const scanResult = await fileService.checkFile(selectedFile.value);
         result.value = scanResult;
+
+        // Если сервер сообщает, что файл не является PE файлом
+        if (scanResult.error === "Invalid file format") {
+          fileTypeError.value = scanResult.message;
+        }
 
         // Save to history in store
         store.dispatch("addScanResult", {
@@ -241,6 +293,7 @@ export default {
       isDragOver,
       isAnalyzing,
       result,
+      fileTypeError,
       progressValue,
       resultClass,
       resultIcon,
@@ -279,6 +332,12 @@ export default {
   flex-direction: column;
   align-items: center;
   justify-content: center;
+}
+
+.file-type-hint {
+  color: #c77dff;
+  font-size: 0.85rem;
+  margin-top: 5px;
 }
 
 .glow-button {

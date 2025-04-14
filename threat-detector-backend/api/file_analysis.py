@@ -33,10 +33,24 @@ async def check_file(file: UploadFile):
         
         temp_file.close()
         
+        # Проверяем, является ли файл PE файлом
+        file_analyzer = FileAnalyzer()
+        is_pe = await file_analyzer._check_if_pe(temp_path)
+        
+        if not is_pe:
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "error": "Invalid file format",
+                    "message": "Only PE (Portable Executable) files are supported",
+                    "is_pe_file": False
+                }
+            )
+        
         # Запускаем анализ с таймаутом
         try:
             result = await asyncio.wait_for(
-                FileAnalyzer().analyze_file(temp_path),
+                file_analyzer.analyze_file(temp_path),
                 timeout=TIMEOUT
             )
             return JSONResponse(content=result)
