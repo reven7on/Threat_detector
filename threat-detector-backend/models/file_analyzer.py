@@ -1,16 +1,16 @@
 import os
 import asyncio
 from typing import Dict, Any
+from .pe_analyzer import PEAnalyzer
 
 class FileAnalyzer:
     """
-    Placeholder for the file analysis model.
-    This will be implemented later with actual ML functionality.
+    Analyzer for different types of files.
+    Currently supports PE (Portable Executable) files.
     """
     
     def __init__(self):
-        # This will be initialized with the ML model in the future
-        self.model = None
+        self.pe_analyzer = PEAnalyzer()
     
     async def analyze_file(self, file_path: str) -> Dict[str, Any]:
         """
@@ -26,21 +26,21 @@ class FileAnalyzer:
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"File not found: {file_path}")
             
-        # Получаем размер файла
-        file_size = os.path.getsize(file_path)
-        
         # Проверяем, является ли файл PE файлом
         is_pe = await self._check_if_pe(file_path)
         
-        # В будущем здесь будет реальный анализ с ML моделью
-        # Сейчас возвращаем заглушку
-        return {
-            "is_pe_file": is_pe,
-            "is_malware": False,
-            "confidence": 0.92,
-            "message": "File seems safe (placeholder)",
-            "file_size": file_size
-        }
+        if is_pe:
+            # Используем PEAnalyzer для анализа PE файлов
+            result = self.pe_analyzer.analyze(file_path)
+            if "error" in result:
+                raise ValueError(result["error"])
+            return result
+        else:
+            return {
+                "error": "Unsupported file type",
+                "message": "Only PE (Portable Executable) files are supported",
+                "is_pe_file": False
+            }
     
     async def _check_if_pe(self, file_path: str) -> bool:
         """

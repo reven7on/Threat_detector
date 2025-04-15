@@ -45,7 +45,7 @@ class URLAnalyzer:
         try:
             print(f"Загрузка модели из: {model_path}")
             with open(model_path, 'rb') as f:
-                self.model = pickle.load(f)
+                    self.model = pickle.load(f)
             
             print(f"Загрузка информации о модели из: {model_info_path}")
             with open(model_info_path, 'rb') as f:
