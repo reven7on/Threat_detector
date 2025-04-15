@@ -71,11 +71,11 @@
               <div class="threat-meter">
                 <div
                   class="threat-level"
-                  :style="{ width: result.confidence * 100 + '%' }"
+                  :style="{ width: result.phishing_probability * 100 + '%' }"
                 ></div>
               </div>
               <div class="threat-value">
-                {{ (result.confidence * 100).toFixed(1) }}%
+                {{ (result.phishing_probability * 100).toFixed(1) }}%
               </div>
             </div>
             <div class="info-row">

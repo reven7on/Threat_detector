@@ -7,6 +7,7 @@ import math
 import tldextract
 import os
 import traceback
+import warnings
 
 class URLAnalyzer:
     """
@@ -22,6 +23,9 @@ class URLAnalyzer:
             model_path (str): Путь к файлу модели
             model_info_path (str): Путь к файлу с информацией о модели
         """
+        # Подавляем предупреждения scikit-learn о несоответствии версий
+        warnings.filterwarnings("ignore", category=UserWarning, module="sklearn")
+        
         # Определение путей к файлам модели
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         models_dir = os.path.join(base_dir, "models")
