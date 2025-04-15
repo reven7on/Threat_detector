@@ -110,7 +110,12 @@ class FileAnalyzer:
         
         if is_pe:
             # Анализируем PE файл
-            return self._analyze_pe_file(file_path)
+            result = self._analyze_pe_file(file_path)
+            
+            # Добавляем тип файла
+            result["file_type"] = self._determine_file_type(file_path)
+            
+            return result
         else:
             return {
                 "error": "Unsupported file type",
@@ -345,11 +350,20 @@ class FileAnalyzer:
                         md5_hash.update(chunk)
                 file_md5 = md5_hash.hexdigest()
                 
+                # Определяем тип файла
+                file_type = self._determine_file_type(file_path)
+                
+                # Для заглушки устанавливаем нейтральные значения
+                severity = "warning"
+                alert_type = "warning"
+                threat_percentage = 25
+                
                 # Возвращаем заглушку с базовой информацией
                 return {
                     "file_path": file_path,
                     "file_name": file_name,
                     "file_size": file_size,
+                    "file_type": file_type,
                     "md5": file_md5,
                     "is_legitimate": True,
                     "is_malicious": False,
@@ -359,7 +373,11 @@ class FileAnalyzer:
                     "prediction": "Не определено (модель не загружена)",
                     "confidence": 0.75,
                     "message": "Модель анализа не загружена. Результат ненадежен.",
-                    "is_fallback": True
+                    "is_fallback": True,
+                    "status": "Файл кажется безопасным, но результат ненадежен.",
+                    "threat_percentage": threat_percentage,
+                    "severity": severity,
+                    "alert_type": alert_type
                 }
 
             if not os.path.exists(file_path):
@@ -406,6 +424,26 @@ class FileAnalyzer:
                 for chunk in iter(lambda: f.read(4096), b""):
                     md5_hash.update(chunk)
             file_md5 = md5_hash.hexdigest()
+            
+            # Определяем статус и сообщение
+            if is_legitimate:
+                status = "Файл безопасен."
+                message = "Файл не содержит признаков вредоносного кода."
+                threat_type = "benign"
+                severity = "safe"
+                alert_type = "info"
+            else:
+                status = "Этот файл может содержать вредоносный код."
+                message = "Обнаружены признаки вредоносного ПО. Рекомендуется проверка антивирусом."
+                threat_type = "malware"
+                severity = "critical"
+                alert_type = "danger"
+                
+            # Определяем уровень угрозы по вероятности
+            confidence = float(max(legitimate_prob, malicious_prob))
+            
+            # Процент угрозы (для фронтенда)
+            threat_percentage = int(malicious_prob * 100)
 
             # Формируем результат в формате, совместимом с фронтендом
             result = {
@@ -417,10 +455,14 @@ class FileAnalyzer:
                 "is_malicious": not bool(is_legitimate),
                 "legitimate_probability": float(legitimate_prob),
                 "malicious_probability": float(malicious_prob),
-                "threat_type": "malware" if not is_legitimate else "benign",
+                "threat_type": threat_type,
                 "prediction": "Легитимный" if is_legitimate else "Вредоносный",
-                "confidence": float(max(legitimate_prob, malicious_prob)),
-                "message": "Этот файл может содержать вредоносный код." if not is_legitimate else "Файл безопасен."
+                "confidence": confidence,
+                "message": message,
+                "status": status,
+                "threat_percentage": threat_percentage,
+                "severity": severity,
+                "alert_type": alert_type
             }
 
             return result
@@ -430,4 +472,45 @@ class FileAnalyzer:
             return {
                 "error": f"Ошибка при анализе файла: {str(e)}",
                 "traceback": traceback.format_exc()
-            } 
+            }
+
+    def _determine_file_type(self, file_path: str) -> str:
+        """
+        Определяет тип PE файла на основе его характеристик
+        """
+        try:
+            pe = pefile.PE(file_path)
+            
+            # Проверяем тип файла по характеристикам
+            if pe.is_dll():
+                return "Dynamic Link Library (DLL)"
+            elif pe.is_exe():
+                # Дополнительная проверка на различные типы исполняемых файлов
+                if hasattr(pe, 'VS_FIXEDFILEINFO'):
+                    if pe.VS_FIXEDFILEINFO.FileType == 1:
+                        return "Application (EXE)"
+                    elif pe.VS_FIXEDFILEINFO.FileType == 2:
+                        return "Dynamic Link Library (DLL)"
+                return "Application (EXE)"
+            elif pe.is_driver():
+                return "Driver (SYS)"
+            else:
+                # Проверяем расширение
+                ext = os.path.splitext(file_path)[1].lower()
+                if ext == '.exe':
+                    return "Application (EXE)"
+                elif ext == '.dll':
+                    return "Dynamic Link Library (DLL)"
+                elif ext == '.sys':
+                    return "Driver (SYS)"
+                elif ext == '.scr':
+                    return "Screen Saver (SCR)"
+                elif ext == '.ocx':
+                    return "ActiveX Control (OCX)"
+                elif ext == '.cpl':
+                    return "Control Panel Applet (CPL)"
+                else:
+                    return "PE File"
+        except:
+            # Если не удалось определить точный тип, возвращаем более общий
+            return "Executable (PE)" 

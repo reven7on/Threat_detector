@@ -8,7 +8,7 @@ from typing import Optional
 import asyncio
 
 router = APIRouter()
-MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
+MAX_FILE_SIZE = 20 * 1024 * 1024  # 20MB
 CHUNK_SIZE = 1024 * 1024  # 1MB chunks
 TIMEOUT = 30  # 30 seconds timeout
 

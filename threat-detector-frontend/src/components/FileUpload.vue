@@ -65,6 +65,23 @@
 
     <!-- Analysis results -->
     <div v-if="result" class="results mt-4">
+      <!-- Warning alert for malicious files -->
+      <div v-if="result.is_malicious" class="alert alert-danger mb-4">
+        <div class="d-flex align-items-center">
+          <i class="fas fa-exclamation-triangle fa-2x me-3"></i>
+          <div>
+            <h4 class="alert-heading mb-2">
+              WARNING: Malicious File Detected!
+            </h4>
+            <p class="mb-0">
+              This file has been identified as potentially malicious. It may
+              contain viruses, trojans, or other harmful code. We recommend not
+              using this file and deleting it immediately.
+            </p>
+          </div>
+        </div>
+      </div>
+
       <div class="report-card" :class="resultClass">
         <div class="report-header">
           <i :class="resultIcon" class="me-2"></i>
@@ -87,7 +104,8 @@
             <div class="info-row">
               <span class="info-label">File Type:</span>
               <span class="info-value">{{
-                result.is_pe_file ? "PE Executable" : "Unknown"
+                result.file_type ||
+                (result.is_pe_file ? "PE Executable" : "Unknown")
               }}</span>
             </div>
           </div>
@@ -98,31 +116,41 @@
               <div class="threat-meter">
                 <div
                   class="threat-level"
-                  :style="{ width: result.confidence * 100 + '%' }"
+                  :style="{
+                    width:
+                      (result.threat_percentage || result.confidence * 100) +
+                      '%',
+                  }"
                 ></div>
               </div>
               <div class="threat-value">
-                {{ (result.confidence * 100).toFixed(1) }}%
+                {{
+                  result.threat_percentage
+                    ? result.threat_percentage.toFixed(1)
+                    : (result.confidence * 100).toFixed(1)
+                }}%
               </div>
             </div>
             <div class="info-row">
               <span class="info-label">Status:</span>
-              <span class="info-value">{{ result.message }}</span>
+              <span class="info-value">{{
+                result.status || result.message
+              }}</span>
             </div>
             <div class="info-row">
               <span class="info-label">Malware:</span>
               <span
                 class="info-value status"
-                :class="result.is_malware ? 'status-bad' : 'status-good'"
+                :class="result.is_malicious ? 'status-bad' : 'status-good'"
               >
-                {{ result.is_malware ? "Detected" : "Not Detected" }}
+                {{ result.is_malicious ? "Detected" : "Not Detected" }}
               </span>
             </div>
           </div>
 
           <div class="report-section" v-if="!result.error">
             <h5>Recommendations</h5>
-            <p v-if="result.is_malware" class="recommendation warning">
+            <p v-if="result.is_malicious" class="recommendation warning">
               <i class="fas fa-exclamation-triangle me-2"></i>
               This file appears to be malicious. We recommend deleting it
               immediately and scanning your system for other threats.
@@ -161,14 +189,14 @@ export default {
     const resultClass = computed(() => {
       if (!result.value) return "";
       if (result.value.error) return "alert-warning";
-      if (result.value.is_malware) return "alert-danger";
+      if (result.value.is_malicious) return "alert-danger";
       return "alert-success";
     });
 
     const resultIcon = computed(() => {
       if (!result.value) return "";
       if (result.value.error) return "fas fa-exclamation-triangle";
-      if (result.value.is_malware) return "fas fa-virus";
+      if (result.value.is_malicious) return "fas fa-virus";
       return "fas fa-shield-alt";
     });
 
@@ -251,6 +279,7 @@ export default {
 
       try {
         const scanResult = await fileService.checkFile(selectedFile.value);
+        console.log("Backend response:", scanResult); // Debug logging
         result.value = scanResult;
 
         // Если сервер сообщает, что файл не является PE файлом
@@ -266,6 +295,7 @@ export default {
           timestamp: new Date().toISOString(),
         });
       } catch (err) {
+        console.error("File analysis error:", err);
         error.value = err.message || "Error analyzing file";
         result.value = { error: error.value };
       } finally {
@@ -590,6 +620,35 @@ export default {
   100% {
     opacity: 0.7;
     transform: scale(1.05);
+  }
+}
+
+/* Warning alert styles */
+.alert-danger {
+  background-color: rgba(247, 37, 133, 0.1);
+  border: 2px solid #f72585;
+  color: #ffffff;
+  animation: pulse-warning 2s infinite;
+}
+
+.alert-danger .alert-heading {
+  color: #f72585;
+  font-weight: 600;
+}
+
+.alert-danger i {
+  color: #f72585;
+}
+
+@keyframes pulse-warning {
+  0% {
+    box-shadow: 0 0 0 0 rgba(247, 37, 133, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(247, 37, 133, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(247, 37, 133, 0);
   }
 }
 </style>
