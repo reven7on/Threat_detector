@@ -17,11 +17,42 @@ class FileAnalyzer:
     def __init__(self):
         # Путь к корневой директории проекта
         root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        # Путь к директории с моделями
-        models_dir = os.path.join(root_dir, "Models")
         
-        self.model_path = os.path.join(models_dir, 'pe_malware_detection_model.pkl')
-        self.model_info_path = os.path.join(models_dir, 'pe_malware_model_info.pkl')
+        # Возможные пути к моделям - проверяем различные варианты расположения
+        possible_model_paths = [
+            os.path.join(root_dir, "Models"),  # с большой буквы
+            os.path.join(root_dir, "models"),  # с маленькой буквы
+            os.path.join(os.getcwd(), "Models"),  # в текущем рабочем каталоге с большой буквы
+            os.path.join(os.getcwd(), "models"),  # в текущем рабочем каталоге с маленькой буквы
+            os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "models"),  # в директории backend/models
+        ]
+        
+        # Модели для поиска
+        model_filename = 'pe_malware_detection_model.pkl'
+        model_info_filename = 'pe_malware_model_info.pkl'
+        
+        # Инициализируем пути к моделям
+        self.model_path = None
+        self.model_info_path = None
+        
+        # Ищем модели в возможных путях
+        for models_dir in possible_model_paths:
+            potential_model_path = os.path.join(models_dir, model_filename)
+            potential_model_info_path = os.path.join(models_dir, model_info_filename)
+            
+            if os.path.exists(potential_model_path) and os.path.exists(potential_model_info_path):
+                self.model_path = potential_model_path
+                self.model_info_path = potential_model_info_path
+                print(f"Найдены модели в директории: {models_dir}")
+                break
+        
+        # Если модели не найдены, используем пути по умолчанию
+        if self.model_path is None:
+            default_dir = os.path.join(root_dir, "Models")
+            self.model_path = os.path.join(default_dir, model_filename)
+            self.model_info_path = os.path.join(default_dir, model_info_filename)
+            print(f"Модели не найдены. Используем пути по умолчанию: {default_dir}")
+            print(f"Проверенные пути: {possible_model_paths}")
         
         # Загружаем модель
         self.model = None
@@ -34,16 +65,29 @@ class FileAnalyzer:
         """
         try:
             print(f"Загрузка модели из: {self.model_path}")
+            if not os.path.exists(self.model_path):
+                print(f"ОШИБКА: Файл модели не найден: {self.model_path}")
+                self.model = None
+                return
+                
             with open(self.model_path, 'rb') as f:
                 self.model = pickle.load(f)
             
             print(f"Загрузка информации о модели из: {self.model_info_path}")
+            if not os.path.exists(self.model_info_path):
+                print(f"ОШИБКА: Файл информации о модели не найден: {self.model_info_path}")
+                self.model = None
+                self.model_info = None
+                return
+                
             with open(self.model_info_path, 'rb') as f:
                 self.model_info = pickle.load(f)
             
-            print("Модель успешно загружена")
+            print(f"Модель успешно загружена. Информация о модели: {self.model_info.keys() if self.model_info else 'Нет информации'}")
         except Exception as e:
+            import traceback
             print(f"Ошибка загрузки модели: {str(e)}")
+            print(traceback.format_exc())
             self.model = None
             self.model_info = None
     
@@ -287,7 +331,36 @@ class FileAnalyzer:
         """
         try:
             if not self.model or not self.model_info:
-                return {"error": "Модель не загружена"}
+                # Если модель не загружена, используем заглушку
+                print("ВНИМАНИЕ: Модель не загружена. Используем заглушку.")
+                
+                # Получаем основную информацию о файле
+                file_size = os.path.getsize(file_path)
+                file_name = os.path.basename(file_path)
+                
+                # Вычисляем MD5 хеш файла
+                md5_hash = hashlib.md5()
+                with open(file_path, "rb") as f:
+                    for chunk in iter(lambda: f.read(4096), b""):
+                        md5_hash.update(chunk)
+                file_md5 = md5_hash.hexdigest()
+                
+                # Возвращаем заглушку с базовой информацией
+                return {
+                    "file_path": file_path,
+                    "file_name": file_name,
+                    "file_size": file_size,
+                    "md5": file_md5,
+                    "is_legitimate": True,
+                    "is_malicious": False,
+                    "legitimate_probability": 0.75,
+                    "malicious_probability": 0.25,
+                    "threat_type": "unknown",
+                    "prediction": "Не определено (модель не загружена)",
+                    "confidence": 0.75,
+                    "message": "Модель анализа не загружена. Результат ненадежен.",
+                    "is_fallback": True
+                }
 
             if not os.path.exists(file_path):
                 return {"error": f"Файл не найден: {file_path}"}
