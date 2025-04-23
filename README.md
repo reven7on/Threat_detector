@@ -1,75 +1,161 @@
-# ThreatDetector
+# ThreatDetector 🛡️
 
-Приложение для обнаружения потенциальных угроз на основе анализа файлов и URL.
+<div align="center">
+  <img src="threat-detector-frontend\src\assets\logo.png" alt="ThreatDetector Logo" width="200"/>
+  <br>
+  <p><strong>Advanced malware detection platform powered by machine learning</strong></p>
+  <a href="https://threatdetector.onrender.com">Live Demo</a> | 
+  <a href="#features">Features</a> | 
+  <a href="#tech-stack">Tech Stack</a> | 
+  <a href="#installation">Installation</a> | 
+  <a href="#usage">Usage</a>
+</div>
 
-## Локальная разработка
+## 📋 Overview
 
-### С использованием Docker
+ThreatDetector is an advanced security platform designed to identify potential threats through sophisticated analysis of files and URLs. The platform uses machine learning models to detect malicious patterns in PE (Portable Executable) files and phishing URLs.
 
-1. Клонируйте репозиторий:
+🔗 **Live Demo**: [https://threatdetector.onrender.com](https://threatdetector.onrender.com)
 
-```
-git clone https://github.com/ваш-юзернейм/ThreatDetector.git
+<div align="center">
+  <img src="docs/images/dashboard.png" alt="ThreatDetector Dashboard" width="800"/>
+</div>
+
+## ✨ Features
+
+- **PE File Analysis** - Detect malware in Windows executable files
+- **URL Phishing Detection** - Identify potentially malicious websites
+- **Detailed Threat Reports** - Get comprehensive information about detected threats
+- **Modern, Responsive UI** - User-friendly interface that works on desktop and mobile
+- **REST API** - Integrate with your existing security tools
+
+<div align="center">
+  <img src="docs/images/file-analysis.png" alt="File Analysis" width="400"/>
+  <img src="docs/images/url-analysis.png" alt="URL Analysis" width="400"/>
+</div>
+
+## 🔧 Tech Stack
+
+### Frontend
+
+- **Vue.js 3** - Progressive JavaScript framework
+- **Bootstrap 5** - Frontend CSS framework
+- **Axios** - HTTP client for API requests
+- **FontAwesome** - Icon library
+
+### Backend
+
+- **FastAPI** - Modern, high-performance web framework for Python
+- **Uvicorn** - ASGI server
+- **Scikit-learn** - Machine learning library for threat detection models
+- **Pandas** - Data manipulation and analysis
+
+### Machine Learning Models
+
+- Custom PE file malware detection model
+- URL phishing detection model
+
+## 🚀 Installation
+
+### Prerequisites
+
+- Python 3.8+
+- Node.js 14+
+- npm or yarn
+
+### Option 1: Using Docker (Recommended)
+
+```bash
+# Clone the repository
+git clone https://github.com/reven7on/ThreatDetector.git
 cd ThreatDetector
-```
 
-2. Запустите приложение с помощью Docker Compose:
-
-```
+# Start the application with Docker Compose
 docker-compose up --build
 ```
 
-3. Откройте браузер и перейдите по адресу: http://localhost
+### Option 2: Manual Setup
 
-### Без Docker
+#### Backend Setup
 
-#### Запуск бэкенда:
-
-```
+```bash
+# Navigate to backend directory
 cd threat-detector-backend
+
+# Create and activate virtual environment
 python -m venv venv
-source venv/bin/activate  # Для Windows: venv\Scripts\activate
+# On Windows
+venv\Scripts\activate
+# On macOS/Linux
+source venv/bin/activate
+
+# Install dependencies
 pip install -r requirements.txt
+
+# Run the backend server
 python main.py
 ```
 
-#### Запуск фронтенда:
+#### Frontend Setup
 
-```
+```bash
+# Navigate to frontend directory
 cd threat-detector-frontend
+
+# Install dependencies
 npm install
+
+# Run the development server
 npm run serve
 ```
 
-## Деплой на Render
+## 💻 Usage
 
-1. Зарегистрируйтесь на [Render](https://render.com) и подключите свой GitHub репозиторий.
+1. **File Analysis**: Upload a PE file (Windows executable) to scan for malware
+2. **URL Analysis**: Enter a URL to check if it's a potential phishing site
+3. **View Results**: Get detailed analysis about potential threats
 
-2. Создайте новый Web Service и выберите опцию "Deploy from a Blueprint".
+<div align="center">
+  <img src="docs/images/results.png" alt="Analysis Results" width="800"/>
+</div>
 
-3. Укажите путь к файлу `render.yaml` в вашем репозитории.
+## 📚 API Documentation
 
-4. Нажмите "Apply" и дождитесь завершения деплоя.
+The API documentation is available at the following endpoints:
 
-5. Приложение будет доступно по предоставленному Render URL (обычно что-то вроде https://threatdetector.onrender.com).
+- **Swagger UI**: `/docs`
+- **ReDoc**: `/redoc`
 
-## Структура проекта
+### API Endpoints
 
-- `threat-detector-frontend/` - Vue.js фронтенд
-- `threat-detector-backend/` - FastAPI бэкенд
-- `Dockerfile` - Единый Docker образ, содержащий фронтенд и бэкенд
-- `docker-compose.yml` - Конфигурация для локальной разработки
-- `render.yaml` - Конфигурация для деплоя на Render
-- `nginx.conf` - Конфигурация Nginx для объединения фронтенда и бэкенда
-- `start-services.sh` - Скрипт для запуска сервисов в Docker контейнере
+- `GET /api/` - Welcome message
+- `POST /api/file/check` - Check a file for malware
+- `POST /api/url/check` - Check a URL for phishing
 
-## API Endpoints
+## 🌐 Deployment
 
-- `GET /api/` - Приветственное сообщение API
-- `POST /api/file/check` - Проверка файла на наличие вредоносного кода
-- `POST /api/url/check` - Проверка URL на потенциальные угрозы
+### Deploying on Render
 
-Интерактивная документация API доступна по адресам:
+1. Fork this repository
+2. Connect your GitHub account to [Render](https://render.com)
+3. Create a new Web Service with the "Deploy from a Blueprint" option
+4. Select your forked repository and the `render.yaml` blueprint
+5. Deploy and access your application at the provided URL
 
-- Swagger UI: `/docs`
-- ReDoc: `/redoc`
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## 📄 License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## 📬 Contact
+
+For questions or feedback, please [open an issue](https://github.com/reven7on/ThreatDetector/issues) on GitHub.
+
+---
+
+<div align="center">
+  Made with ❤️ by Makar Lyapich
+</div>

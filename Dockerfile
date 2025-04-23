@@ -32,9 +32,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Создаем директорию для моделей ПЕРЕД копированием моделей
 RUN mkdir -p /app/models
 
-# Копируем файлы моделей с хоста (из корневой папки Models) 
-# в директорию /app/models внутри образа
-COPY Models/*.pkl /app/models/
+# Копируем файлы моделей с хоста из реорганизованной структуры
+COPY Models/trained_models/*.pkl /app/models/
 
 # Копируем весь остальной код бэкенда
 COPY threat-detector-backend/ .
